@@ -13,7 +13,7 @@ NTFY_TOPIC = os.getenv("NTFY_TOPIC") or "fes-ai-dizi-bots-4b"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HACKER_NEWS_URL = "https://hn.algolia.com/api/v1/search"
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "openai/gpt-oss-20b"
 
 TOPICS = [
     {

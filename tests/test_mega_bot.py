@@ -116,7 +116,7 @@ class SummaryTests(unittest.TestCase):
 
         self.assertEqual(result, "🌟 خبر مهم")
         call = client.chat.completions.create.call_args.kwargs
-        self.assertEqual(call["model"], "llama-3.1-8b-instant")
+        self.assertEqual(call["model"], "openai/gpt-oss-20b")
         self.assertEqual(
             call["messages"][0]["content"],
             "You are a news expert. Topic: AI Engineering News. "

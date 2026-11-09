@@ -9,7 +9,7 @@ Actions runs it while your computer is off.
 - Searches Hacker News first and GitHub repositories as a fallback for the
   GitHub topic. When search APIs have no results, Groq receives a short
   knowledge-based fallback prompt.
-- Summarizes results with Groq's `llama-3.1-8b-instant` model.
+- Summarizes results with Groq's `openai/gpt-oss-20b` model.
 - Sends one report to your ntfy topic.
 - Optionally sends the first 900 characters through CallMeBot for WhatsApp.
 - Runs daily at 08:00, 12:00, and 20:00 UTC, or manually from GitHub Actions.
