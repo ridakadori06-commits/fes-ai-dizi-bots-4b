@@ -6,15 +6,17 @@ Actions runs it while your computer is off.
 
 ## What it does
 
-- Searches each topic with the DuckDuckGo Instant Answer API.
+- Searches Hacker News first and GitHub repositories as a fallback for the
+  GitHub topic. When search APIs have no results, Groq receives a short
+  knowledge-based fallback prompt.
 - Summarizes results with Groq's `llama-3.1-8b-instant` model.
 - Sends one report to your ntfy topic.
 - Optionally sends the first 900 characters through CallMeBot for WhatsApp.
 - Runs daily at 08:00, 12:00, and 20:00 UTC, or manually from GitHub Actions.
 
-Each scheduled run includes all 10 topics. DuckDuckGo's Instant Answer API
-does not always return current or detailed results, so some summaries may say
-that information was unavailable.
+Each scheduled run includes all 10 topics. The search APIs may return no
+results; if so, the bot gives Groq a knowledge-based fallback prompt instead
+of stopping the topic.
 
 ## Setup on GitHub
 
@@ -67,7 +69,8 @@ optional; the bot works without it.
 
 كل تشغيل مبرمج كيجمع المواضيع العشرة كاملين. المواعيد هي 08:00 و12:00
 و20:00 بتوقيت UTC، وممكن GitHub يتأخر شوية فبداية التشغيل. API ديال
-DuckDuckGo مرات ما كيرجعش معلومات جديدة أو كافية.
+البحث مرات ما كيرجعش نتائج؛ فهاد الحالة البوت كيعطي Groq معلومات عامة باش
+يكمّل الملخص بلا ما يوقف الموضوع.
 
 تنبيه: مواضيع ntfy عموميين؛ أي واحد عارف الاسم يقدر يشوف الرسائل. ما تحطش
 معلومات خاصة فالتقرير، واستعمل اسم صعيب التخمين إلا احتجتي خصوصية أكثر.

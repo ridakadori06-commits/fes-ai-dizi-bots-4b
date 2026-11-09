@@ -11,7 +11,8 @@ from groq import Groq
 
 NTFY_TOPIC = os.getenv("NTFY_TOPIC") or "fes-ai-dizi-bots-4b"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-DUCKDUCKGO_URL = "https://api.duckduckgo.com/"
+HACKER_NEWS_URL = "https://hn.algolia.com/api/v1/search"
+GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 GROQ_MODEL = "llama-3.1-8b-instant"
 
 TOPICS = [
@@ -68,66 +69,88 @@ TOPICS = [
 ]
 
 
-def extract_search_text(data):
-    """Collect useful text fields from DuckDuckGo's Instant Answer response."""
-    parts = []
+def search(topic, query):
+    """Search Hacker News, then GitHub for its topic, then use a safe prompt fallback."""
+    fallback = "Use your own knowledge, today is 2026, give fresh news"
 
-    for key in ("AbstractText", "Answer", "Definition"):
-        value = data.get(key)
-        if isinstance(value, str) and value.strip():
-            parts.append(value.strip())
+    try:
+        response = requests.get(
+            HACKER_NEWS_URL,
+            params={"query": query, "hitsPerPage": 5},
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict) or not isinstance(data.get("hits"), list):
+            raise ValueError("Hacker News returned an unexpected response")
 
-    for key in ("Results", "RelatedTopics"):
-        pending = list(data.get(key, [])) if isinstance(data.get(key), list) else []
-        while pending:
-            item = pending.pop()
-            if not isinstance(item, dict):
-                continue
-            text = item.get("Text")
-            if isinstance(text, str) and text.strip():
-                parts.append(text.strip())
-            children = item.get("Topics")
-            if isinstance(children, list):
-                pending.extend(children)
+        titles = [
+            hit["title"].strip()
+            for hit in data["hits"]
+            if isinstance(hit, dict)
+            and isinstance(hit.get("title"), str)
+            and hit["title"].strip()
+        ]
+        if titles:
+            return "\n".join(titles)
+        print(f"Hacker News returned no results for: {topic}")
+    except (requests.RequestException, ValueError, TypeError) as error:
+        print(f"Hacker News search failed for '{topic}': {error}")
 
-    return "\n".join(dict.fromkeys(parts))[:3000]
-
-
-def search_topic(query):
-    """Search DuckDuckGo and retry once when the request or response fails."""
-    for attempt in range(2):
+    if "github" in topic.casefold():
         try:
             response = requests.get(
-                DUCKDUCKGO_URL,
-                params={"q": query, "format": "json"},
-                timeout=20,
+                GITHUB_SEARCH_URL,
+                params={
+                    "q": "AI language:python",
+                    "sort": "stars",
+                    "order": "desc",
+                    "per_page": 5,
+                },
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": "fes-ai-dizi-bots-4b",
+                },
+                timeout=15,
             )
             response.raise_for_status()
             data = response.json()
-            if not isinstance(data, dict):
-                raise ValueError("DuckDuckGo returned an unexpected response")
-            return extract_search_text(data)
-        except (requests.RequestException, ValueError, TypeError) as error:
-            print(f"Search attempt {attempt + 1} failed for '{query}': {error}")
-            if attempt == 0:
-                time.sleep(1)
+            if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+                raise ValueError("GitHub returned an unexpected response")
 
-    return ""
+            repositories = []
+            for repository in data["items"]:
+                if not isinstance(repository, dict):
+                    continue
+                full_name = repository.get("full_name")
+                if not isinstance(full_name, str) or not full_name.strip():
+                    continue
+                description = repository.get("description") or ""
+                stars = repository.get("stargazers_count", 0)
+                repositories.append(f"{full_name} - {description} - {stars} stars")
+            if repositories:
+                return "\n".join(repositories)
+            print(f"GitHub returned no repositories for: {topic}")
+        except (requests.RequestException, ValueError, TypeError) as error:
+            print(f"GitHub search failed for '{topic}': {error}")
+
+    print(f"Using the knowledge fallback for: {topic}")
+    return fallback
 
 
 def summarize_topic(client, topic, search_text):
-    """Ask Groq to summarize one topic in simple Moroccan Darija."""
+    """Ask Groq for three important news items in simple Moroccan Darija."""
     prompt = (
-        "Summarize in 2 short lines in Moroccan Darija (Arabic dialect), "
-        "simple words, one emoji at start.\n\n"
-        f"Topic: {topic['title']}\n"
-        f"Search results:\n{search_text}"
+        f"You are a news expert. Topic: {topic['title']}. Info: {search_text}. "
+        "Give 3 real important news today in Moroccan Darija, 2 lines each, "
+        "with emoji. If no info, give general important news in this field, "
+        "never say 'no info'."
     )
     response = client.chat.completions.create(
         model=GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=120,
+        max_tokens=450,
     )
     summary = response.choices[0].message.content
     if not summary or not summary.strip():
@@ -191,11 +214,8 @@ def main():
     for index, topic in enumerate(TOPICS):
         print(f"Processing {index + 1}/{len(TOPICS)}: {topic['title']}")
         try:
-            search_text = search_topic(topic["query"])
-            if not search_text:
-                summary = "⚠️ ما لقيناش معلومات كافية لهاد الموضوع دابا."
-            else:
-                summary = summarize_topic(client, topic, search_text)
+            search_text = search(topic["title"], topic["query"])
+            summary = summarize_topic(client, topic, search_text)
         except Exception as error:
             print(f"Topic failed ({topic['id']}): {error}")
             summary = "⚠️ تعذر إعداد الملخص لهاد الموضوع دابا."
